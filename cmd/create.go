@@ -30,8 +30,10 @@ import (
 // createCmd represents the create command
 var createCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Create a drp catalog",
-	Long: `Used to create a custom catalog for Digital Rebar.`,
+	Short: "Create a custom catalog for Digital Rebar",
+	Long: `drpcli catalog create --catalog-src https://repo.rackn.io/ -p stable -o new_catalog.json 
+Would create a new catalog in your cwd named new_catalog.json and would contain only stable 
+versions of the packages.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		command(cmd, args)
 	},
@@ -45,16 +47,7 @@ var catalog models.Content
 func init() {
 	rootCmd.AddCommand(createCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// createCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// createCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	createCmd.Flags().StringVarP(&catalogSrc, "catalog-src", "c", "", "catalog-src someCatalog (required)")
+	createCmd.Flags().StringVarP(&catalogSrc, "catalog-src", "c", "", "catalog-src someCatalog (required) URL or File Path supported")
 	createCmd.MarkFlagRequired("catalog-src")
 	createCmd.Flags().StringVarP(&pkgVer, "pkg-version", "p", "", "pkg-version tip|stable (required)")
 	createCmd.MarkFlagRequired("pkg-version")
@@ -74,9 +67,8 @@ func command(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
-	//cataMap := catalogToMap(&catalog)
-
-	//mainLoop()
+	newCat := extractPackageSet(&catalog, pkgVer)
+	writeCatalog(newCat, outfile)
 }
 
 func isValidURl(toTest string) bool {
@@ -149,58 +141,17 @@ func writeCatalog(cat *models.Content, filename string) {
 	}
 }
 
-
-//func createView() {
-//	view := ui.AddWindow(5, 5, 80, 24, "RackN Catalog Generator")
-//	view.SetTitleButtons(ui.ButtonMaximize | ui.ButtonClose)
-//	view.SetActiveBackColor(ui.ColorBlack)
-//
-//	cataFrame := ui.CreateFrame(view, 10, 12, ui.BorderThin, ui.AutoSize)
-//	cataFrame.SetActiveBackColor(ui.ColorBlack)
-//
-//
-//	frmFull := ui.CreateFrame(cataFrame, 40, 5, ui.BorderThin, ui.Fixed)
-//
-//	frmFull.SetTitle("Catalog Items")
-//	frmFull.SetActiveBackColor(ui.ColorBlack)
-//	//frmHalf := ui.CreateFrame(frmViews, 8, 5, ui.BorderThin, ui.Fixed)
-//	//frmHalf.SetPack(ui.Vertical)
-//	//frmHalf.SetTitle("Half")
-//	//frmNone := ui.CreateFrame(frmViews, 8, 5, ui.BorderThin, ui.Fixed)
-//	//frmNone.SetPack(ui.Vertical)
-//	//frmNone.SetTitle("None")
-//	//
-//	btnF1 := ui.CreateButton(frmFull, 2, 2, "Quit", ui.Fixed)
-//	btnF1.SetShadowType(ui.ShadowNone)
-//	btnF1.SetSize(1,1)
-//	btnF1.SetTextColor(ui.ColorWhiteBold)
-//	btnF1.SetBackColor(ui.ColorBlack)
-//	btnF1.SetActiveBackColor(ui.ColorBlack)
-//	btnF1.SetScale(10)
-//	btnF1.SetPos(10, 20)
-//
-//	btnF1.OnClick(func(ev ui.Event) {
-//		go ui.Stop()
-//	})
-//	//btnH3.OnClick(func(ev ui.Event) {
-//	//	go ui.Stop()
-//	//})
-//	//btnN3.OnClick(func(ev ui.Event) {
-//	//	go ui.Stop()
-//	//})
-//	//
-//	ui.ActivateControl(view, btnF1)
-//
-//}
-//
-//func mainLoop() {
-//	// Every application must create a single Composer and
-//	// call its intialize method
-//	ui.InitLibrary()
-//	defer ui.DeinitLibrary()
-//
-//	createView()
-//
-//	// start event processing loop - the main core of the library
-//	ui.MainLoop()
-//}
+func extractPackageSet(cat *models.Content, version string) *models.Content {
+	newMap := map[string]interface{}{}
+	for k, v := range cat.Sections["catalog_items"] {
+		item := &models.CatalogItem{}
+		if err := models.Remarshal(v, &item); err != nil {
+			continue
+		}
+		if item.Version == version {
+			newMap[k] = item
+		}
+	}
+	cat.Sections["catalog_items"] = newMap
+	return cat
+}
